@@ -391,8 +391,23 @@ class ApiConfig {
   Future<void> loadDefaultConfig() async {
     final apiUrl = HawkStore.get<String>(HawkConfig.apiUrl, defaultValue: '') ?? '';
     if (apiUrl.isEmpty) {
-      // 内置默认源（可后续在 assets 维护）
-      LOG.i('ApiConfig', '未配置 API URL，等待用户在设置中添加');
+      // 使用内置默认测试源，首次启动自动写入
+      await HawkStore.put(HawkConfig.apiUrl, HawkConfig.defaultApiUrl);
+      LOG.i('ApiConfig', '首次启动，写入默认 API URL');
+      // 触发一次拉取并缓存（异步，不阻塞启动）
+      final c = Completer<void>();
+      unawaited(loadConfig(useCache: true, callback: ({required bool success, String? error}) {
+        if (success) {
+          LOG.i('ApiConfig', '默认源加载成功');
+        } else {
+          LOG.w('ApiConfig', '默认源加载失败: $error');
+        }
+        if (!c.isCompleted) c.complete();
+      }));
+      // 最多等 10 秒，避免阻塞过久
+      try {
+        await c.future.timeout(const Duration(seconds: 10));
+      } catch (_) {}
     }
   }
 }

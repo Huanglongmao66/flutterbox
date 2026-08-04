@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../utils/log.dart';
 
@@ -13,6 +14,9 @@ class HawkStore {
   static Box? _box;
 
   static Future<void> init() async {
+    // 桌面/移动：hive_flutter 负责初始化存储路径
+    // Web：Hive.initFlutter 已兼容
+    await Hive.initFlutter();
     _box = await Hive.openBox(_boxName);
   }
 

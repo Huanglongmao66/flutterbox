@@ -1,6 +1,5 @@
 // 应用入口，对应原项目 com.github.tvbox.osc.base.App
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import 'core/constants/app_constants.dart';
 import 'core/focus/tv_focus.dart';
@@ -22,17 +21,12 @@ class TvBoxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // 全局 Provider 在此注册
-      ],
-      child: TvFocusScope(
-        child: MaterialApp.router(
-          title: AppConstants.appName,
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.dark(),
-          routerConfig: appRouter,
-        ),
+    return TvFocusScope(
+      child: MaterialApp.router(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark(),
+        routerConfig: appRouter,
       ),
     );
   }

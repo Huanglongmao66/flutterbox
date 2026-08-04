@@ -1,6 +1,9 @@
 // 全局存储 Key 常量，对应原项目 com.github.tvbox.osc.util.HawkConfig
 class HawkConfig {
+  HawkConfig._();
+
   static const String apiUrl = 'api_url';
+  static const String defaultApiUrl = 'https://9280.kstore.vip/newwex.json'; // 测试默认源
   static const String epgUrl = 'epg_url';
   static const String showPreview = 'show_preview';
   static const String apiHistory = 'api_history';
