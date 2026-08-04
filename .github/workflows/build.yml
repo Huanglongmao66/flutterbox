@@ -1,0 +1,156 @@
+name: 构建发布包
+
+# 触发条件：手动运行、推送 v* 标签
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（留空则使用 pubspec 中的版本）'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FLUTTER_VERSION: '3.44.7'
+
+jobs:
+  # ============== Android 分架构构建 ==============
+  build-android:
+    name: Android ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: armeabi-v7a
+            target-platform: android-arm
+          - abi: arm64-v8a
+            target-platform: android-arm64
+          - abi: x86_64
+            target-platform: android-x64
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 配置 Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装依赖
+        run: flutter pub get
+
+      - name: 构建分架构 APK
+        run: flutter build apk --release --target-platform ${{ matrix.target-platform }} --split-per-abi
+
+      - name: 重命名产物
+        run: |
+          mkdir -p output
+          # split-per-abi 产物位于 build/app/outputs/flutter-apk/
+          cp build/app/outputs/flutter-apk/app-${{ matrix.abi }}-release.apk \
+             output/tvbox-${{ matrix.abi }}-release.apk
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvbox-android-${{ matrix.abi }}
+          path: output/*.apk
+          retention-days: 30
+
+  # ============== Windows 安装包构建 ==============
+  build-windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get
+
+      - name: 构建 Windows Release
+        run: flutter build windows --release
+
+      - name: 打包为 zip
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9.]+)\+').Matches.Groups[1].Value
+          if (-not $version) { $version = "1.0.0" }
+          mkdir output
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath output\tvbox-windows-$version.zip -Force
+          Write-Host "版本: $version"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvbox-windows
+          path: output/*.zip
+          retention-days: 30
+
+  # ============== 汇总发布 Release ==============
+  release:
+    name: 发布 Release
+    needs: [build-android, build-windows]
+    runs-on: ubuntu-latest
+    # 手动触发或打标签时才发布
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 读取版本号
+        id: version
+        run: |
+          VERSION=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "当前版本: $VERSION"
+
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 整理产物
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.apk" -o -name "*.zip" \) -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
+          name: TVBox Flutter v${{ steps.version.outputs.version }}
+          body: |
+            # TVBox Flutter v${{ steps.version.outputs.version }}
+
+            ## 下载说明
+            - **Android arm64-v8a**：64位 ARM 设备（绝大多数现代手机/电视盒子）
+            - **Android armeabi-v7a**：32位 ARM 设备（旧设备）
+            - **Android x86_64**：x86 模拟器/Intel 设备
+            - **Windows**：Windows 10/11 PC，解压后运行 tvbox.exe
+
+            构建编号: #${{ github.run_number }}
+            提交: ${{ github.sha }}
+          files: release/*
+          draft: false
+          prerelease: false
