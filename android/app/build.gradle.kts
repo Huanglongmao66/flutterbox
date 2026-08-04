@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.github.tvbox.tvbox"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -42,4 +42,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ExoPlayer / Media3（平台通道集成）
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.4.1")
+    implementation("androidx.media3:media3-common:1.4.1")
 }
