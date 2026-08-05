@@ -14,7 +14,12 @@ class JsonSpider extends Spider {
 
   void _ensureApi() {
     _api = ext;
-    // ext 通常是 api 地址；若为空则需 SourceBean.api
+  }
+
+  /// 检查 api 是否为有效 HTTP URL
+  /// 编译型 JAR 降级时 ext 可能是 Jar 类名（如 csp_XXX），不是有效 URL
+  bool get _isValidApi {
+    return _api.startsWith('http://') || _api.startsWith('https://');
   }
 
   /// 构造完整请求 URL
@@ -29,6 +34,7 @@ class JsonSpider extends Spider {
   @override
   Future<String> homeContent({bool filter = true}) async {
     _ensureApi();
+    if (!_isValidApi) return '{}';
     final url = _buildUrl({'ac': 'list'});
     final body = await httpGet(url);
     try {
@@ -59,6 +65,7 @@ class JsonSpider extends Spider {
   @override
   Future<String> homeVideoContent() async {
     _ensureApi();
+    if (!_isValidApi) return '{}';
     final url = _buildUrl({'ac': 'detail', 'pg': '1'});
     return httpGet(url);
   }
@@ -71,6 +78,7 @@ class JsonSpider extends Spider {
     Map<String, String> extend = const {},
   }) async {
     _ensureApi();
+    if (!_isValidApi) return '{"list":[],"page":"$page","pagecount":0,"limit":0,"total":0}';
     final params = <String, String>{
       'ac': 'list',
       't': tid,
@@ -100,7 +108,7 @@ class JsonSpider extends Spider {
   @override
   Future<String> detailContent(List<String> ids) async {
     _ensureApi();
-    if (ids.isEmpty) return '{"list":[]}';
+    if (!_isValidApi || ids.isEmpty) return '{"list":[]}';
     final url = _buildUrl({'ac': 'detail', 'ids': ids.join(',')});
     final body = await httpGet(url);
     try {
@@ -120,6 +128,7 @@ class JsonSpider extends Spider {
     String page = '1',
   }) async {
     _ensureApi();
+    if (!_isValidApi) return '{"list":[]}';
     final url = _buildUrl({'ac': 'detail', 'wd': key, 'pg': page});
     final body = await httpGet(url);
     try {
